@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\SignUpMail;
+use App\Models\Shop;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -28,6 +29,20 @@ class UserController extends Controller
                 'password' => 'required|string|min:6',
 
             ]);
+
+            if (isset($request->image)) {
+
+                $image = $request->file('image');
+                $ext = $image->getClientOriginalExtension();
+                //make a unique name
+                $filename = uniqid() . '.' . $ext;
+                //upload the image
+                $image->move(public_path('/image'), $filename);
+
+                $request->merge([
+                    'images' => $filename,
+                ]);
+            }
 
             if ($validator->fails()) {
                 return response()->json($validator->errors()->toJson(), 400);
@@ -198,10 +213,10 @@ class UserController extends Controller
             $password = Hash::make($request->password);
             $updateUser =  User::where(['email' => $request->email])->update(['password' => $password]);
             $user = User::where(['email' => $request->email])->first();
-            if($updateUser){
+            if ($updateUser) {
                 return response()->json(["status" => 200, "message" => "Success", 'user' => $user]);
             }
-            
+
             // if ($user) {
             //     auth()->login($user, true);
             //     User::where(['email' => $request->email]);
@@ -223,7 +238,40 @@ class UserController extends Controller
         // ));
 
     }
+    public function shop(Request $request)
+    {
+        if ($request->isMethod('post')) {
+            $validator = Validator::make($request->all(), [
+                'shop_name' => 'required',
+                'shop_address' => 'required',
+                'device' => 'required',
+            ]);
 
+            if (isset($request->shop_image)) {
+
+                $image = $request->file('shop_image');
+                $ext = $image->getClientOriginalExtension();
+                //make a unique name
+                $filename = uniqid() . '.' . $ext;
+                //upload the image
+                $image->move(public_path('/shop_image'), $filename);
+
+                $request->merge([
+                    'shop_images' => $filename,
+                ]);
+            }
+
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 422);
+            }
+            $shop = Shop::create($request->all());
+
+            return response()->json([
+                'message' => 'Shop successfully registered',
+                'shop' => $shop
+            ], 201);
+        }
+    }
 
     //
     protected function createNewToken($token)

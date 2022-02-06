@@ -22,4 +22,5 @@ Route::match(['get','post'], '/login', 'UserController@login');
 Route::match(['get','post'], '/change-password', 'UserController@change_password');
 Route::match(['get','post'], '/forget-password', 'UserController@forget_password');
 Route::match(['get','post'], '/confirm-otp', 'UserController@confirm_otp');
+Route::match(['get','post'], '/shop', 'UserController@shop');
 
