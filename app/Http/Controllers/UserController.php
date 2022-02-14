@@ -11,9 +11,15 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Tymon\JWTAuth\Exceptions\JWTException;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class UserController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware(['jwt.verify'], ['except' => ['sign_up', 'login']]);
+    }
     public function sign_up(Request $request)
     {
 
@@ -58,82 +64,50 @@ class UserController extends Controller
                 'user' => $user
             ], 201);
 
-            // $link = env('MY_HOST_SERVER') . '/verification/' . base64_encode($request->email);
-            // $full_name = $request->lname . ' ' . $request->fname;
-
-            // $message = '
-            //     <div>Hello ' . $full_name . '</div>
-            //     <div>Thank you for signing up on Product. Please confirm your email address to complete your sign up. 
-            //     It’s easy - Click the button below to access the URL directly.</div><br>
-            //     <div><button style="background: blue; height: 40px;"><a href="' . $link . '" style="text-decoration: none;">Verify Email</a></button></div><br>
-            //     <div>Click <span style="color: blue;"><a href="' . $link . '">here</a></span> to verifiy your account</div>
-            //     <div>Once verified, you may log in and continue to create your magical event!</div><br>
-            //     <div> We can’t wait to host your event!</div><br>
-            //     <div>Products Team</div>
-            // ';
-
-            // $data = [
-            //     "message" => $message,
-            //     'link' => $link,
-            //     'subject' => 'Complete your signup',
-
-            // ];
-            // Mail::to($request->email)->send(new SignUpMail($data));
-
-            // return redirect('/pages/login')->with('success', 'A verification link has been sent to your email. Kindly verify email to continue');
-        }
+             }
     }
 
 
 
     public function login(Request $request)
     {
-        if ($request->isMethod('post')) {
+        $credentials = $request->only('email', 'password');
 
-            $validator = Validator::make($request->all(), [
-                'email' => 'required|email',
-                'password' => 'required|string|min:6',
-            ]);
+        //valid credential
+        $validator = Validator::make($credentials, [
+            'email' => 'required|email',
+            'password' => 'required|string|min:6|max:50'
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json($validator->errors(), 422);
-            }
-            $credentials = request(['email', 'password']);
-
-            if (!$token = auth('api')->attempt($credentials)) {
-                return response()->json(['error' => 'Unauthorized'], 401);
-            }
-
-
-            return $this->createNewToken($token);
+        //Send failed response if request is not valid
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->messages()], 200);
         }
 
-        //     $validator = Validator::make($request->all(), [
-        //         'email' => 'required',
-        //         'password' => 'required'
-        //     ]);
-        //     if ($validator->fails()) {
-        //         return back()->withErrors($validator);
-        //     }
-        //     $credentials = $request->only('email', 'password');
-        //     if (!Auth::attempt($credentials, $request->remember)) {
-        //         return back()->with('error', 'Invalid login details');
-        //     }
-        //     if (Auth::user()->role == 'user') {
-        //         return redirect('/');
-        //     } else 
-        //     if (Auth::user()->role == 'admin') {
-        //         return redirect('/');
-        //     } else 
-        //     if (Auth::user()->role == 'engineer') {
-        //         return redirect('/');
-        //     }
+        //Request is validated
+        //Crean token
+        try {
+            if (!$token = JWTAuth::attempt($credentials)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Login credentials are invalid.',
+                ], 400);
+            }
+        } catch (JWTException $e) {
+            return $credentials;
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not create token.',
+            ], 500);
+        }
 
 
-        //     return redirect('/users/dashboard');
-        // }
-
-        // return view('pages.login');
+        //Token created, return with success response and jwt token
+        return response()->json([
+            'success' => true,
+            'token' => $token,
+            'user' => Auth::user()
+        ]);
     }
 
     public function forget_password(Request $request)
@@ -155,19 +129,7 @@ class UserController extends Controller
             "status" => 200, "message" => "OTP sent Successfully"
 
         ]);
-        // if ($user) {
-
-        //     $data = [
-        //         'subject' => 'Testing Application OTP',
-        //         'body' => 'Your OTP is : ' . $otp
-        //     ];
-
-        //     Mail::to($request->email)->send(new sendEmail($data));
-
-        //     return response(["status" => 200, "message" => "OTP sent successfully"]);
-        // } else {
-        //     return response(["status" => 401, 'message' => 'Invalid']);
-        // }
+       
     }
 
     public function confirm_otp(Request $request)
@@ -185,16 +147,7 @@ class UserController extends Controller
             return response()->json(["status" => 200, "message" => "Success", 'Continue to change Password',]);
         }
 
-        // if($user){
-        //     auth()->login($user, true);
-        //     User::where('email','=',$request->email)->update(['otp' => null]);
-        //     $accessToken = auth()->user()->createToken('authToken')->accessToken;
-
-        //     return response(["status" => 200, "message" => "Success", 'user' => auth()->user(), 'access_token' => $accessToken]);
-        // }
-        // else{
-        //     return response(["status" => 401, 'message' => 'Invalid']);
-        // }
+       
     }
 
     public function change_password(Request $request)
@@ -217,27 +170,13 @@ class UserController extends Controller
                 return response()->json(["status" => 200, "message" => "Success", 'user' => $user]);
             }
 
-            // if ($user) {
-            //     auth()->login($user, true);
-            //     User::where(['email' => $request->email]);
-
-            //     return response(["status" => 200, "message" => "Success", 'user' => auth()->user()]);
-            // } else {
-            //     return response(["status" => 401, 'message' => 'Invalid']);
-            // }
-
-
-            // return response()->json([
-            //     'message' => 'Password changed successfully',
-
-            // ], 201);
+           
         }
-        //  User::create(array_merge(
-        //     $validator->validated(),
-        //     ['password' => bcrypt($request->password)]
-        // ));
+     
 
     }
+
+
     public function shop(Request $request)
     {
         if ($request->isMethod('post')) {
@@ -264,6 +203,8 @@ class UserController extends Controller
             if ($validator->fails()) {
                 return response()->json($validator->errors(), 422);
             }
+
+
             $shop = Shop::create($request->all());
 
             return response()->json([
@@ -271,6 +212,11 @@ class UserController extends Controller
                 'shop' => $shop
             ], 201);
         }
+    }
+
+    public function refresh()
+    {
+        return $this->createNewToken(auth()->refresh());
     }
 
     //
